@@ -10,6 +10,12 @@ import UIKit
 import CoreData
 
 class UsersController: UITableViewController, CreateUserControllerDelegate {
+    func didEditUser(user: User) {
+        let row = users.index(of: user)
+        let reloadIndexPath = IndexPath(row: row! , section: 0)
+        tableView.reloadRows(at: [reloadIndexPath], with: .fade)
+    }
+    
     func didAddUser(user: User) {
         users.insert(user, at: 0)
         
@@ -20,27 +26,38 @@ class UsersController: UITableViewController, CreateUserControllerDelegate {
     var users = [User]()
     
     override func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath) -> [UITableViewRowAction]? {
-        let deleteAction = UITableViewRowAction(style: .destructive, title: "Delete") { (_, indexPath) in
-            let user = self.users[indexPath.row]
-            
-            self.users.remove(at: indexPath.row)
-            self.tableView.deleteRows(at: [indexPath], with: .automatic)
-            
-            let context = CoreDataManager.shared.persistentContainer.viewContext
-            context.delete(user)
-            
-            do {
-                try context.save()
-            } catch let saveErr {
-                print("Error deleting user", saveErr)
-            }
-        }
+        let deleteAction = UITableViewRowAction(style: .destructive, title: "Delete", handler: deleteHandler)
+        deleteAction.backgroundColor = UIColor.orange
         
-        let editAction = UITableViewRowAction(style: .normal, title: "Edit") { (_, indexPath) in
-            print("Editing")
-        }
+        let editAction = UITableViewRowAction(style: .normal, title: "Edit", handler: editHandler)
+        editAction.backgroundColor = UIColor.purple
         
         return [deleteAction, editAction]
+    }
+    
+    private func deleteHandler(action: UITableViewRowAction, indexPath: IndexPath) {
+        let user = self.users[indexPath.row]
+        
+        self.users.remove(at: indexPath.row)
+        self.tableView.deleteRows(at: [indexPath], with: .automatic)
+        
+        let context = CoreDataManager.shared.persistentContainer.viewContext
+        context.delete(user)
+        
+        do {
+            try context.save()
+        } catch let saveErr {
+            print("Error deleting user", saveErr)
+        }
+    }
+    
+    private func editHandler(action: UITableViewRowAction, indexPath: IndexPath) {
+        let editUserController = CreateUserController()
+        editUserController.delegate = self
+        editUserController.user = users[indexPath.row]
+        
+        let navController = CustomNavigationController(rootViewController: editUserController)
+        present(navController, animated: true, completion: nil)
     }
     
     private func fetchUsers() {
@@ -100,8 +117,18 @@ class UsersController: UITableViewController, CreateUserControllerDelegate {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cellId", for: indexPath)
         
+        let user = users[indexPath.row]
+        if let name = user.name, let birthdate = user.birthdate {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMM dd, yyyy"
+            let formattedBirthdate = dateFormatter.string(from: birthdate)
+            
+            cell.textLabel?.text = "\(name) - Birthday \(formattedBirthdate )"
+        } else {
+            cell.textLabel?.text = user.name
+        }
+        
         cell.backgroundColor = .cellBgColor
-        cell.textLabel?.text = users[indexPath.row].name
         cell.textLabel?.textColor = .white
         cell.textLabel?.font = UIFont.boldSystemFont(ofSize: 16)
         

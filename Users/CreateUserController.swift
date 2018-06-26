@@ -11,9 +11,18 @@
  
  protocol CreateUserControllerDelegate {
     func didAddUser(user: User)
+    func didEditUser(user: User)
  }
  
  class CreateUserController: UIViewController {
+    var user: User? {
+        didSet {
+            nameTextField.text = user?.name
+            guard let birthdate = user?.birthdate else { return }
+            datePicker.date = birthdate
+        }
+    }
+    
     var delegate: CreateUserControllerDelegate?
     
     let nameLabel: UILabel = {
@@ -31,14 +40,25 @@
         return textField
     }()
     
+    let datePicker: UIDatePicker = {
+        let dp = UIDatePicker()
+        dp.datePickerMode = .date
+        dp.translatesAutoresizingMaskIntoConstraints = false
+        return dp
+    }()
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        navigationItem.title = user == nil ? "Create user" : "Edit user"
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         view.backgroundColor = UIColor.tableBgColor
         
         setupUI()
-        
-        navigationItem.title = "Create User"
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "Cancel", style: .plain, target: self, action: #selector(handleCancel))
         
@@ -53,7 +73,7 @@
         backgroundView.topAnchor.constraint(equalTo: view.topAnchor).isActive = true
         backgroundView.leftAnchor.constraint(equalTo: view.leftAnchor).isActive = true
         backgroundView.rightAnchor.constraint(equalTo: view.rightAnchor).isActive = true
-        backgroundView.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        backgroundView.heightAnchor.constraint(equalToConstant: 250).isActive = true
         
         view.addSubview(nameLabel)
         nameLabel.topAnchor.constraint(equalTo: view.topAnchor).isActive = true
@@ -66,14 +86,25 @@
         nameTextField.rightAnchor.constraint(equalTo: view.rightAnchor).isActive = true
         nameTextField.bottomAnchor.constraint(equalTo: nameLabel.bottomAnchor).isActive = true
         nameTextField.topAnchor.constraint(equalTo: nameLabel.topAnchor).isActive = true
+        
+        view.addSubview(datePicker)
+        datePicker.topAnchor.constraint(equalTo: nameLabel.bottomAnchor).isActive = true
+        datePicker.leftAnchor.constraint(equalTo: view.leftAnchor).isActive = true
+        datePicker.rightAnchor.constraint(equalTo: view.rightAnchor).isActive = true
+        datePicker.bottomAnchor.constraint(equalTo: backgroundView.bottomAnchor).isActive = true
     }
     
     @objc func handleSave() {
+        user == nil ? createUser() : saveUserChanges()
+    }
+    
+    private func createUser() {
         let context = CoreDataManager.shared.persistentContainer.viewContext
         
         let user = NSEntityDescription.insertNewObject(forEntityName: "User", into: context)
         
         user.setValue(nameTextField.text, forKey: "name")
+        user.setValue(datePicker.date, forKey: "birthdate")
         
         do {
             try context.save()
@@ -83,6 +114,23 @@
             })
         } catch let saveErr {
             print("Failed to save user", saveErr)
+        }
+    }
+    
+    private func saveUserChanges() {
+        let context = CoreDataManager.shared.persistentContainer.viewContext
+        
+        user?.name = nameTextField.text
+        user?.birthdate = datePicker.date
+        
+        do {
+            try context.save()
+            
+            dismiss(animated: true) {
+                self.delegate?.didEditUser(user: self.user!)
+            }
+        } catch let editErr {
+            print("Error while editing", editErr)
         }
     }
     
